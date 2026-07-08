@@ -33,14 +33,10 @@ kernel_main(void)
     /* C言語の仕様では未初期化の静的変数は0でなければならないので、起動直後に自力でBSSをゼロクリアする */
     memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 
+    kprintf("\n\nHello %s!\n", "World");
+
     /* 現時点では割り込みハンドラも戻るべきプロセスも無いので、wfiでCPUを停止し続ける */
     for (;;) {
         __asm__ __volatile__("wfi");
     }
-}
-
-void
-putchar(char c)
-{
-    (void)c;
 }
