@@ -9,9 +9,18 @@
 /* SBI拡張ID */
 #define SBI_CONSOLE_PUTCHAR 1
 
-/* S-Modeからハードウェアに直接アクセスできないため、ecallでOpenSBIに処理を委譲する */
-struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
-                       long arg5, long fid, long eid) {
+/* SBI ecallの戻り値 */
+struct sbiret {
+    long error;
+    long value;
+};
+
+/*
+ * ecallでS-ModeからM-ModeのOpenSBIに処理を委譲する。
+ * SBIの呼出規約では、a0〜a5=引数、a6=fid(機能ID)、a7=eid(拡張ID)をレジスタに設定してからecallを発行する
+ */
+static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
+                              long arg5, long fid, long eid) {
     register long a0 __asm__("a0") = arg0;
     register long a1 __asm__("a1") = arg1;
     register long a2 __asm__("a2") = arg2;
@@ -23,8 +32,7 @@ struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
 
     __asm__ __volatile__("ecall"
                          : "=r"(a0), "=r"(a1)
-                         : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5),
-                           "r"(a6), "r"(a7)
+                         : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7)
                          : "memory");
     return (struct sbiret){.error = a0, .value = a1};
 }
