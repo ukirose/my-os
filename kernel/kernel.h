@@ -6,6 +6,12 @@
 
 #pragma once
 
+/* 可変長引数はコンパイラが提供するbuiltinを利用する。標準ライブラリに依存しないため */
+#define va_list  __builtin_va_list
+#define va_start __builtin_va_start
+#define va_end   __builtin_va_end
+#define va_arg   __builtin_va_arg
+
 /*
  * リンカスクリプトが出力するメモリ境界シンボル。
  * ベアメタル環境にはCRTが存在せずメモリレイアウトを自力で管理する必要があるため直接参照する。
