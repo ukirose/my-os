@@ -5,6 +5,6 @@
  */
 #pragma once
 
-typedef unsigned int size_t;
-
-#define NULL  ((void *) 0)
+typedef unsigned char  uint8_t;
+typedef unsigned int   uint32_t;
+typedef uint32_t       size_t;
