@@ -7,7 +7,7 @@ BUILD_DIR = ../build/kernel
 KERNEL_ELF = $(BUILD_DIR)/kernel.elf
 KERNEL_MAP = $(BUILD_DIR)/kernel.map
 
-SRCS = main.c sbi.c string.c kprintf.c
+SRCS = $(wildcard *.c)
 OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
