@@ -35,8 +35,5 @@ kernel_main(void)
 
     kprintf("\n\nHello %s!\n", "World");
 
-    /* 現時点では割り込みハンドラも戻るべきプロセスも無いので、wfiでCPUを停止し続ける */
-    for (;;) {
-        __asm__ __volatile__("wfi");
-    }
+    PANIC("booted!");
 }
