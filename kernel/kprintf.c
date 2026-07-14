@@ -11,9 +11,7 @@ static void print_int(int value);
 static void print_hex(unsigned value);
 
 /* 書式付き文字列をシリアルコンソールに出力する */
-void
-kprintf(const char *fmt, ...)
-{
+void kprintf(const char *fmt, ...) {
     va_list vargs;
     va_start(vargs, fmt);
 
@@ -49,18 +47,14 @@ kprintf(const char *fmt, ...)
 }
 
 /* 文字列を1文字ずつ出力する */
-static void
-print_str(const char *s)
-{
+static void print_str(const char *s) {
     while (*s) {
         putchar(*s++);
     }
 }
 
 /* 数値を10進数で出力する */
-static void
-print_int(int value)
-{
+static void print_int(int value) {
     if (value == 0) {
         putchar('0');
         return;
@@ -85,9 +79,7 @@ print_int(int value)
 }
 
 /* 数値を16進数で出力する */
-static void
-print_hex(unsigned value)
-{
+static void print_hex(unsigned value) {
     if (value == 0) {
         putchar('0');
         return;

@@ -31,9 +31,7 @@ char *strcpy(char *dst, const char *src) {
 }
 
 /* s1とs2を比較し、等しければ0、s1>s2なら正の値、s1<s2なら負の値を返す */
-int
-strcmp(const char *s1, const char *s2)
-{
+int strcmp(const char *s1, const char *s2) {
     while (*s1 && *s2) {
         if (*s1 != *s2)
             break;

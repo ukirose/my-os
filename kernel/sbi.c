@@ -40,8 +40,6 @@ static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long a
     return (struct sbiret){.error = a0, .value = a1};
 }
 
-void
-putchar(char c)
-{
+void putchar(char c) {
     sbi_call(c, 0, 0, 0, 0, 0, 0, SBI_CONSOLE_PUTCHAR);
 }
