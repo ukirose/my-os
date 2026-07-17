@@ -32,3 +32,8 @@ extern char __bss[], __bss_end[], __stack_top[];
 
 void kprintf(const char *fmt, ...);
 void putchar(char c);
+
+struct trapframe;
+void trap_init(void);
+void kernel_entry(void);
+void handle_trap(struct trapframe *f);

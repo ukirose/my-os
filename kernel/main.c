@@ -14,9 +14,7 @@ extern char __bss[], __bss_end[], __stack_top[];
 __attribute__((section(".text.boot")))
 /* スタックが使えない状態で呼び出されるので、コンパイラがプロローグでspを操作するのを抑止する */
 __attribute__((naked))
-void
-boot(void)
-{
+void boot(void) {
     __asm__ __volatile__(
         /* Cの呼び出し規約がスタックを要求するので、最初にスタックポインタを設定する */
         "mv sp, %[stack_top]\n"
@@ -27,13 +25,13 @@ boot(void)
 }
 
 /* bootからスタックを受け取り、BSSクリア・メインループを開始するカーネルのエントリポイント */
-void
-kernel_main(void)
-{
+void kernel_main(void) {
     /* C言語の仕様では未初期化の静的変数は0でなければならないので、起動直後に自力でBSSをゼロクリアする */
     memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 
     kprintf("\n\nHello %s!\n", "World");
 
-    PANIC("booted!");
+    /* 例外ハンドラを登録したあと、不正命令で意図的に例外を起こし動作を確認する */
+    trap_init();
+    __asm__ __volatile__("unimp");
 }
