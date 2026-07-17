@@ -53,15 +53,14 @@ static void print_str(const char *s) {
     }
 }
 
-/* 数値を10進数で出力する */
 static void print_int(int value) {
     if (value == 0) {
         putchar('0');
         return;
     }
 
-    int sign = value;
-    if (sign < 0) value = -value;
+    int negative = (value < 0);
+    if (negative) value = -value;
 
     char num_buf[32];
     int digit_index = 0;
@@ -71,14 +70,13 @@ static void print_int(int value) {
         value /= 10;
     }
 
-    if (sign < 0) num_buf[digit_index++] = '-';
+    if (negative) num_buf[digit_index++] = '-';
 
     while (digit_index > 0) {
         putchar(num_buf[--digit_index]);
     }
 }
 
-/* 数値を16進数で出力する */
 static void print_hex(unsigned value) {
     if (value == 0) {
         putchar('0');

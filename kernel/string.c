@@ -5,6 +5,7 @@
  */
 
 #include "types.h"
+#include "string.h"
 
 /* 指定されたメモリ領域を1バイトずつ指定された値で塗りつぶす */
 void *memset(void *s, int c, size_t n) {

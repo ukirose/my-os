@@ -15,6 +15,14 @@ struct sbiret {
     long value;
 };
 
+static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
+                              long arg5, long fid, long eid);
+
+/* SBI経由で1文字をシリアルコンソールに出力する */
+void putchar(char c) {
+    sbi_call(c, 0, 0, 0, 0, 0, 0, SBI_CONSOLE_PUTCHAR);
+}
+
 /*
  * ecallでS-ModeからM-ModeのOpenSBIに処理を委譲する。
  * SBIの呼出規約では、a0〜a5=引数、a6=fid(機能ID)、a7=eid(拡張ID)をレジスタに設定してからecallを発行する
@@ -38,8 +46,4 @@ static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long a
                          : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7)
                          : "memory");
     return (struct sbiret){.error = a0, .value = a1};
-}
-
-void putchar(char c) {
-    sbi_call(c, 0, 0, 0, 0, 0, 0, SBI_CONSOLE_PUTCHAR);
 }

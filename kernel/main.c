@@ -4,9 +4,6 @@
  * カーネルの起動処理と初期化完了後のメインループを提供する
  */
 
-/* リンカスクリプトで定義されたシンボル */
-extern char __bss[], __bss_end[], __stack_top[];
-
 #include "kernel.h"
 #include "string.h"
 
