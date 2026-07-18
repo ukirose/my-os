@@ -24,6 +24,29 @@ void boot(void) {
     );
 }
 
+static void delay(void) {
+    for (int i = 0; i < 30000000; i++)
+        __asm__ __volatile__("nop"); /* 何もしない命令 */
+}
+
+static void proc_a_entry(void) {
+    kprintf("starting process A\n");
+    while (1) {
+        putchar('A');
+        yield();
+        delay();
+    }
+}
+
+static void proc_b_entry(void) {
+    kprintf("starting process B\n");
+    while (1) {
+        putchar('B');
+        yield();
+        delay();
+    }
+}
+
 /* bootからスタックを受け取り、BSSクリア・メインループを開始するカーネルのエントリポイント */
 void kernel_main(void) {
     /* C言語の仕様では未初期化の静的変数は0でなければならないので、起動直後に自力でBSSをゼロクリアする */
@@ -33,11 +56,11 @@ void kernel_main(void) {
 
     kprintf("\n\nHello %s!\n", "World");
 
-    /* ページアロケータの動作確認 */
-    paddr_t paddr0 = alloc_pages(2);
-    paddr_t paddr1 = alloc_pages(1);
-    kprintf("alloc_pages test: paddr0=%x\n", paddr0);
-    kprintf("alloc_pages test: paddr1=%x\n", paddr1);
+    proc_init();
+    create_process((uint32_t) proc_a_entry);
+    create_process((uint32_t) proc_b_entry);
 
-    PANIC("booted!");
+    yield();
+
+    PANIC("switched to idle process");
 }

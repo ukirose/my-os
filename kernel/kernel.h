@@ -10,7 +10,11 @@
 /* メモリ管理 */
 paddr_t alloc_pages(size_t n);
 
-
+/* プロセス管理 */
+struct process;
+void proc_init(void);
+struct process *create_process(uint32_t pc);
+void yield(void);
 
 /* コンソール・ユーティリティ */
 void kprintf(const char *fmt, ...);

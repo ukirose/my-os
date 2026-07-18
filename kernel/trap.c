@@ -12,8 +12,6 @@ static uint32_t r_stval(void);
 static uint32_t r_sepc(void);
 static void w_stvec(uint32_t v);
 
-void kernel_entry(void);
-void handle_trap(struct trapframe *f);
 /* 例外発生時の汎用レジスタのスナップショット */
 struct trapframe {
     uint32_t ra, gp, tp;                                        /* 戻りアドレス, グローバルポインタ, スレッドポインタ */
@@ -22,6 +20,9 @@ struct trapframe {
     uint32_t s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;  /* 保存レジスタ */
     uint32_t sp;                                                /* スタックポインタ */
 } __attribute__((packed));         /* kernel_entry と構造体レイアウトを一致させるためパディングしない */
+
+void kernel_entry(void);
+void handle_trap(struct trapframe *f);
 
 /* 例外ハンドラの有効化 */
 void trap_init(void) {
@@ -33,9 +34,9 @@ __attribute__((naked))
 __attribute__((aligned(4)))         /* stvecの下位2bitはフラグとして使われるため、0b100(=4)の倍数に配置 */
 void kernel_entry(void) {           /* staticを付けると、アドレスが stvec 経由で CPU に使われていると認識されず、 コンパイラが関数を消去しうる */
     __asm__ __volatile__(
-        /* sp は sw のベースアドレスとして使われているため直接保存できないため、退避処理 */
-        "csrw sscratch, sp\n"       /* 次の addi で sp が壊れる前に、 例外発生直後の sp を sscratch に退避 */
-        "addi sp, sp, -4 * 31\n"    /* スタックに trapframe 構造体分の領域を確保 */
+        /* 実行中プロセスのカーネルスタックをsscratchから取り出す（tmp = sp; sp = sscratch; sscratch = tmp;） */
+        "csrrw sp, sscratch, sp\n"
+        "addi sp, sp, -4 * 31\n"
 
         /* 全ての汎用レジスタをスタックに退避 */
         "sw ra,  4 * 0(sp)\n"
@@ -69,8 +70,12 @@ void kernel_entry(void) {           /* staticを付けると、アドレスが s
         "sw s10, 4 * 28(sp)\n"
         "sw s11, 4 * 29(sp)\n"
                                     /* 例外発生直後の sp の復元と保存 */
-        "csrr a0, sscratch\n"       /* sscratch から例外発生直後の sp を a0 に復元 */
-        "sw a0, 4 * 30(sp)\n"       /* a0 から確保領域の末尾スロット(sp レジスタ)に、 例外発生直後の sp を保存 */
+        "csrr a0, sscratch\n"
+        "sw a0, 4 * 30(sp)\n"
+
+        /* 次回トラップ発生時に備え、カーネルスタックを設定し直す */
+        "addi a0, sp, 4 * 31\n"
+        "csrw sscratch, a0\n"
 
         /* 例外ハンドラの実行 */
         "mv a0, sp\n"               /* 関数呼び出し時に第一引数として使われる a0 に、 sp が指す確保領域の先頭アドレスをセット */
