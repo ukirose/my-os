@@ -1,10 +1,17 @@
 /*
  * kprintf.c
  *
- * 動的メモリ割り当てやファイルI/Oに依存できないため、書式変換を内部バッファとputcharのみで完結させる
+ * 内部バッファとputcharのみで完結する書式付き出力
  */
 
+#include "types.h"
 #include "kernel.h"
+
+/* 標準ライブラリに依存しないため、可変長引数はコンパイラが提供するbuiltinを利用する */
+#define va_list  __builtin_va_list
+#define va_start __builtin_va_start
+#define va_end   __builtin_va_end
+#define va_arg   __builtin_va_arg
 
 static void print_str(const char *s);
 static void print_int(int value);
@@ -46,7 +53,6 @@ void kprintf(const char *fmt, ...) {
     va_end(vargs);
 }
 
-/* 文字列を1文字ずつ出力する */
 static void print_str(const char *s) {
     while (*s) {
         putchar(*s++);

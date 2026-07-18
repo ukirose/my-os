@@ -1,7 +1,7 @@
 /*
  * trap.c
  *
- * 例外 ・割り込みハンドラを提供する
+ * 例外および割り込みの捕捉とハンドリング
  */
 
 #include "types.h"
@@ -12,6 +12,8 @@ static uint32_t r_stval(void);
 static uint32_t r_sepc(void);
 static void w_stvec(uint32_t v);
 
+void kernel_entry(void);
+void handle_trap(struct trapframe *f);
 /* 例外発生時の汎用レジスタのスナップショット */
 struct trapframe {
     uint32_t ra, gp, tp;                                        /* 戻りアドレス, グローバルポインタ, スレッドポインタ */

@@ -1,7 +1,7 @@
 /*
  * sbi.c
  *
- * ecall命令でS-ModeからM-ModeのOpenSBIへハードウェア操作を委譲する
+ * ecall命令によるS-ModeからM-ModeのOpenSBIへのハードウェア操作の委譲
  */
 
 #include "kernel.h"
@@ -45,5 +45,6 @@ static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long a
                          : "=r"(a0), "=r"(a1)
                          : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7)
                          : "memory");
+
     return (struct sbiret){.error = a0, .value = a1};
 }

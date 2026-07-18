@@ -1,7 +1,7 @@
 /*
  * string.c
  *
- * カーネル内で使うメモリ操作・文字列操作関数を提供する
+ * 連続したデータ領域を操作するための内部実装
  */
 
 #include "types.h"
@@ -12,6 +12,7 @@ void *memset(void *s, int c, size_t n) {
     uint8_t *p = s;             /* あらゆる型を受け取るvoid*を1バイト単位で操作するためuint8_t*にキャスト */
     while (n--)
         *p++ = (uint8_t)c;
+
     return s;
 }
 
@@ -21,6 +22,7 @@ void *memcpy(void *dst, const void *src, size_t n) {
     const uint8_t *s = (const uint8_t *) src;
     while (n--)
         *d++ = *s++;
+
     return dst;
 }
 
@@ -28,6 +30,7 @@ void *memcpy(void *dst, const void *src, size_t n) {
 char *strcpy(char *dst, const char *src) {
     char *d = dst;
     while ((*d++ = *src++) != '\0');
+
     return dst;
 }
 
