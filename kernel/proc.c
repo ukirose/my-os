@@ -4,7 +4,12 @@
  * プロセスの管理とコンテキストスイッチ
  */
 
+#include "stdint.h"
+#include "types.h"
 #include "kernel.h"
+#include "mmu.h"
+#include "riscv.h"
+#include "stddef.h"
 #include "string.h"
 
 #define PROCS_MAX     8            /* 同時に管理できる最大プロセス数 */
@@ -27,6 +32,7 @@ struct process {
     int pid;                            /* プロセス ID */
     int state;                          /* プロセス状態 */
     vaddr_t sp;                         /* カーネルモードスタックポインタ */
+    pagetable_t page_table;             /* プロセスごとの1段目ページテーブル */
     uint8_t kstack[KSTACK_SIZE];         /* プロセス用カーネルスタック */
 };
 
@@ -76,6 +82,17 @@ struct process *create_process(uint32_t pc) {
     p->pid = p - procs;     /* プロセステーブルのインデックスをそのままPIDとして割り当てる */
     p->state = PROC_RUNNABLE;
 
+    /* 1段目のページテーブルを物理メモリから割り当てる */
+    p->page_table = (pagetable_t)alloc_pages(1);
+
+    /*
+     * カーネルの全メモリ領域（__kernel_base から PHYSTOP まで）をストレートマッピングする
+     * これにより、カーネルコードはページング有効化後も物理アドレスと同じ仮想アドレスで動作し続ける
+     */
+    for (paddr_t paddr = (paddr_t)__kernel_base; paddr < PHYSTOP; paddr += PAGE_SIZE) {
+        map_page(p->page_table, paddr, paddr, PTE_R | PTE_W | PTE_X);
+    }
+
     return p;
 }
 
@@ -112,6 +129,21 @@ void yield(void) {
     /* 実行中のプロセスを更新し、CPUコンテキスト(レジスタ群)を入れ替える */
     struct process *prev = current_proc;
     current_proc = next;
+
+    /*
+     * 次プロセスのページテーブルを satp レジスタに設定し、TLBをフラッシュする
+     * これにより、CPUが見る仮想メモリ空間が次プロセスのものに完全に切り替わる
+     * 破壊: memory (メモリアクセスの最適化順序を抑止し、ページテーブル切り替えの副作用を守る)
+     */
+    __asm__ __volatile__(
+        "sfence.vma\n"
+        "csrw satp, %0\n"
+        "sfence.vma\n"
+        :
+        : "r" (SATP_SV32 | ((uint32_t)next->page_table / PAGE_SIZE))
+        : "memory"
+    );
+
     switch_context(&prev->sp, &next->sp);
 }
 

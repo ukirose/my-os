@@ -4,12 +4,11 @@
  * Bumpアロケータによる物理メモリの割り当て
  */
 
+#include "stddef.h"
 #include "types.h"
 #include "kernel.h"
+#include "mmu.h"
 #include "string.h"
-
-#define PAGE_SIZE 4096                  /* メモリ管理の最小単位 */
-#define PHYSTOP ((paddr_t)0x88000000)   /* 物理メモリ領域の上限 */
 
 extern char _end[];
 

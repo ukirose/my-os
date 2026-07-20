@@ -6,10 +6,9 @@
 
 #pragma once
 
-typedef unsigned char  uint8_t;
-typedef unsigned int   uint32_t;
-typedef uint32_t       size_t;
-typedef uint32_t       paddr_t;
-typedef uint32_t       vaddr_t;
+#include "stdint.h"
 
-#define NULL ((void *)0)
+typedef uint32_t paddr_t;
+typedef uint32_t vaddr_t;
+typedef uint32_t *pagetable_t;
+

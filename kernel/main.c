@@ -4,6 +4,7 @@
  * カーネルの起動処理とメインループ
  */
 
+#include "stdint.h"
 #include "kernel.h"
 #include "string.h"
 

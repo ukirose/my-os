@@ -5,6 +5,7 @@
  */
 
 #include "types.h"
+#include "stdint.h"
 #include "kernel.h"
 
 static uint32_t r_scause(void);

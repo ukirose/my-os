@@ -11,6 +11,7 @@ ENTRY(boot)
 SECTIONS {
     /* OpenSBI がカーネルをロードするアドレス */
     . = 0x80200000;
+    __kernel_base = .;
 
     /* 機械語命令 */
     .text :{
