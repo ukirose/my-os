@@ -11,6 +11,8 @@
 paddr_t alloc_pages(size_t n);
 
 /* プロセス管理 */
+#define KSTACK_SIZE 8192
+
 struct process;
 void proc_init(void);
 struct process *create_process(uint32_t pc);

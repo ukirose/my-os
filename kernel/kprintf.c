@@ -13,6 +13,8 @@
 #define va_end   __builtin_va_end
 #define va_arg   __builtin_va_arg
 
+#define PRINT_BUF_LEN 32
+
 static void print_str(const char *s);
 static void print_int(int value);
 static void print_hex(unsigned value);
@@ -68,7 +70,7 @@ static void print_int(int value) {
     int negative = (value < 0);
     if (negative) value = -value;
 
-    char num_buf[32];
+    char num_buf[PRINT_BUF_LEN];
     int digit_index = 0;
 
     while (value > 0) {
@@ -89,7 +91,7 @@ static void print_hex(unsigned value) {
         return;
     }
 
-    char num_buf[32];
+    char num_buf[PRINT_BUF_LEN];
     int digit_index = 0;
 
     while (value > 0) {

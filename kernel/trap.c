@@ -14,9 +14,10 @@ static void w_stvec(uint32_t v);
 
 /* 例外発生時の汎用レジスタのスナップショット */
 struct trapframe {
-    uint32_t ra, gp, tp;                                        /* 戻りアドレス, グローバルポインタ, スレッドポインタ */
+    uint32_t ra, gp, tp;                                        /* リターンアドレス, グローバルポインタ, スレッドポインタ */
     uint32_t t0, t1, t2, t3, t4, t5, t6;                        /* 一時レジスタ */
-    uint32_t a0, a1, a2, a3, a4, a5, a6, a7;                    /* 引数レジスタ */
+    uint32_t a0, a1;                                            /* 引数・戻り値レジスタ */
+    uint32_t a2, a3, a4, a5, a6, a7;                            /* 引数レジスタ */
     uint32_t s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;  /* 保存レジスタ */
     uint32_t sp;                                                /* スタックポインタ */
 } __attribute__((packed));         /* kernel_entry と構造体レイアウトを一致させるためパディングしない */
@@ -32,13 +33,15 @@ void trap_init(void) {
 /* CPUが例外時にジャンプしてくるエントリーポイント */
 __attribute__((naked))
 __attribute__((aligned(4)))         /* stvecの下位2bitはフラグとして使われるため、0b100(=4)の倍数に配置 */
-void kernel_entry(void) {           /* staticを付けると、アドレスが stvec 経由で CPU に使われていると認識されず、 コンパイラが関数を消去しうる */
+void kernel_entry(void) {           /* staticを付けると、アドレスが stvec 経由で CPU に使われていると認識されず、コンパイラが関数を消去しうる */
     __asm__ __volatile__(
-        /* 実行中プロセスのカーネルスタックをsscratchから取り出す（tmp = sp; sp = sscratch; sscratch = tmp;） */
+        /* 汎用レジスタが使えないため、 sp を例外処理用のカーネルスタックの先頭アドレスが格納されている sscratch の値と入れ替え */
         "csrrw sp, sscratch, sp\n"
+
+        /* そのカーネルスタック上に、例外発生時のレジスタを保存するための退避領域を確保 */
         "addi sp, sp, -4 * 31\n"
 
-        /* 全ての汎用レジスタをスタックに退避 */
+        /* 確保した退避領域に、例外発生時の汎用レジスタを保存 */
         "sw ra,  4 * 0(sp)\n"
         "sw gp,  4 * 1(sp)\n"
         "sw tp,  4 * 2(sp)\n"
@@ -69,19 +72,19 @@ void kernel_entry(void) {           /* staticを付けると、アドレスが s
         "sw s9,  4 * 27(sp)\n"
         "sw s10, 4 * 28(sp)\n"
         "sw s11, 4 * 29(sp)\n"
-                                    /* 例外発生直後の sp の復元と保存 */
+        /* 例外発生時の sp を sscratch から復元し、汎用レジスタ経由で退避領域に保存 */
         "csrr a0, sscratch\n"
         "sw a0, 4 * 30(sp)\n"
 
-        /* 次回トラップ発生時に備え、カーネルスタックを設定し直す */
+        /* 二重トラップに備え、例外処理用のカーネルスタックの先頭アドレスを再度計算し、汎用レジスタ経由で sscratch に再設定 */
         "addi a0, sp, 4 * 31\n"
         "csrw sscratch, a0\n"
 
-        /* 例外ハンドラの実行 */
-        "mv a0, sp\n"               /* 関数呼び出し時に第一引数として使われる a0 に、 sp が指す確保領域の先頭アドレスをセット */
-        "call handle_trap\n"        /* a0 を引数として handle_trap 関数を呼出し */
+        /* 完成した退避領域の先頭アドレス(sp)を第一引数 a0 に渡し、例外ハンドラを呼び出す */
+        "mv a0, sp\n"
+        "call handle_trap\n"
 
-        /* 保存した汎用レジスタを復元 */
+        /* 例外ハンドラから戻ったら、退避領域から全ての汎用レジスタを復元 */
         "lw ra,  4 * 0(sp)\n"
         "lw gp,  4 * 1(sp)\n"
         "lw tp,  4 * 2(sp)\n"
@@ -114,7 +117,7 @@ void kernel_entry(void) {           /* staticを付けると、アドレスが s
         "lw s11, 4 * 29(sp)\n"
         "lw sp,  4 * 30(sp)\n"
 
-        /* 例外発生前の場所から実行再開する */
+        /* 元の処理を再開するため、ハードウェアが保存していたアドレス(sepc)へ復帰 */
         "sret\n"
     );
 }

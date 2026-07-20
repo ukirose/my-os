@@ -1,55 +1,38 @@
 /*
  * main.c
  *
- * カーネルの起動処理と初期化完了後のメインループ
+ * カーネルの起動処理とメインループ
  */
 
 #include "kernel.h"
 #include "string.h"
 
-/* リンカスクリプトが出力する BSS 領域の先頭・末尾とスタック先頭のアドレス */
+/* BSS領域とスタックの境界アドレス(kernel.ldで定義) */
 extern char _bss[], _bss_end[], _stack_top[];
 
+static void proc_a_entry(void);
+static void proc_b_entry(void);
 
-/* OpenSBIが0x80200000へ無条件ジャンプするので、カーネル先頭にbootを強制配置する */
+#define DELAY_LOOPS 30000000           /* プロセス間の実行状態を観察可能にするための遅延ループ回数 */
+
+static void delay(void);
+
+/* カーネルのエントリーポイント(OpenSBIからジャンプされる) */
 __attribute__((section(".text.boot")))
-__attribute__((naked))  /* スタックが使えない状態で呼び出されるので、コンパイラがプロローグでspを操作するのを抑止する */
+__attribute__((naked))
 void boot(void) {
     __asm__ __volatile__(
-        /* Cの呼び出し規約がスタックを要求するので、最初にスタックポインタを設定する */
-        "mv sp, %[stack_top]\n"
+        /* 初期スタックポインタを設定し、カーネルのメイン処理へ移行する */
+        "mv sp, %0\n"
         "j kernel_main\n"
         :
-        : [stack_top] "r" (_stack_top)
+        : "r" (_stack_top)
     );
 }
 
-static void delay(void) {
-    for (int i = 0; i < 30000000; i++)
-        __asm__ __volatile__("nop"); /* 何もしない命令 */
-}
-
-static void proc_a_entry(void) {
-    kprintf("starting process A\n");
-    while (1) {
-        putchar('A');
-        yield();
-        delay();
-    }
-}
-
-static void proc_b_entry(void) {
-    kprintf("starting process B\n");
-    while (1) {
-        putchar('B');
-        yield();
-        delay();
-    }
-}
-
-/* bootからスタックを受け取り、BSSクリア・メインループを開始するカーネルのエントリポイント */
+/* カーネルの初期化処理とマルチタスクの開始 */
 void kernel_main(void) {
-    /* C言語の仕様では未初期化の静的変数は0でなければならないので、起動直後に自力でBSSをゼロクリアする */
+    /* BSS領域をゼロクリアする */
     memset(_bss, 0, (size_t) _bss_end - (size_t) _bss);
 
     trap_init();
@@ -60,7 +43,35 @@ void kernel_main(void) {
     create_process((uint32_t) proc_a_entry);
     create_process((uint32_t) proc_b_entry);
 
+    /* 最初のプロセスへコンテキストスイッチを行う */
     yield();
 
     PANIC("switched to idle process");
+}
+
+/* --- テスト用ユーザープロセスとヘルパー関数 --- */
+
+static void proc_a_entry(void) {
+    kprintf("starting process A\n");
+    while (1) {
+        putchar('A');
+        delay();
+        yield();
+    }
+}
+
+static void proc_b_entry(void) {
+    kprintf("starting process B\n");
+    while (1) {
+        putchar('B');
+        delay();
+        yield();
+    }
+}
+
+/* プロセス間の実行状態を観察可能にするための遅延ループ */
+static void delay(void) {
+    for (int i = 0; i < DELAY_LOOPS; i++) {
+        __asm__ __volatile__("nop");   /* 何もしない命令 */
+    }
 }

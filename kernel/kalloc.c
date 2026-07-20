@@ -21,7 +21,7 @@ paddr_t alloc_pages(size_t n) {
     paddr_t paddr = bump_alloc_ptr;
 
     bump_alloc_ptr += n * PAGE_SIZE;
-    if (bump_alloc_ptr > PHYSTOP) PANIC("out of memory");
+    if (bump_alloc_ptr > PHYSTOP) PANIC("out of memory: alloc_ptr=%x, PHYSTOP=%x", bump_alloc_ptr, PHYSTOP);
 
     memset((void *)paddr, 0, n * PAGE_SIZE);
     return paddr;
