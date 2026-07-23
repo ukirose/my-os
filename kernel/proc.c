@@ -68,7 +68,7 @@ struct process *create_process(uint32_t pc) {
     }
     if (!p) PANIC("no free process slots");
 
-    /* カーネルスタックの末尾に初期コンテキスト（レジスタ退避領域）を配置する */
+    /* カーネルスタックの末尾に初期レジスタの退避領域を確保する */
     uint32_t stack_top = (uint32_t) p->kstack + sizeof(p->kstack);
     struct context *ctx = (struct context *) (stack_top - sizeof(struct context));
 
@@ -85,10 +85,7 @@ struct process *create_process(uint32_t pc) {
     /* 1段目のページテーブルを物理メモリから割り当てる */
     p->page_table = (pagetable_t)alloc_pages(1);
 
-    /*
-     * カーネルの全メモリ領域（__kernel_base から PHYSTOP まで）をストレートマッピングする
-     * これにより、カーネルコードはページング有効化後も物理アドレスと同じ仮想アドレスで動作し続ける
-     */
+    /* ページング有効化後もカーネルの命令を読み込めるよう、カーネル領域を物理アドレスと同一の仮想アドレスで登録する */
     for (paddr_t paddr = (paddr_t)__kernel_base; paddr < PHYSTOP; paddr += PAGE_SIZE) {
         map_page(p->page_table, paddr, paddr, PTE_R | PTE_W | PTE_X);
     }
@@ -126,21 +123,19 @@ void yield(void) {
         : "r" (next_stack_top)
     );
 
-    /* 実行中のプロセスを更新し、CPUコンテキスト(レジスタ群)を入れ替える */
+    /* 実行中のプロセスを更新し、CPUコンテキストを入れ替える */
     struct process *prev = current_proc;
     current_proc = next;
 
-    /*
-     * 次プロセスのページテーブルを satp レジスタに設定し、TLBをフラッシュする
-     * これにより、CPUが見る仮想メモリ空間が次プロセスのものに完全に切り替わる
-     * 破壊: memory (メモリアクセスの最適化順序を抑止し、ページテーブル切り替えの副作用を守る)
-     */
+    /* 次プロセスの仮想メモリ空間へ切り替える */
+    uint32_t next_ppn = (uint32_t)next->page_table / PAGE_SIZE;
+    uint32_t next_satp = SATP_SV32 | next_ppn;
     __asm__ __volatile__(
-        "sfence.vma\n"
+        "sfence.vma\n"  /* メモリアクセスの順序を制御し、先行するメモリ操作の完了を保証する */
         "csrw satp, %0\n"
-        "sfence.vma\n"
+        "sfence.vma\n"  /* 誤参照を防ぐため、古い変換キャッシュ(TLB)を全消去する */
         :
-        : "r" (SATP_SV32 | ((uint32_t)next->page_table / PAGE_SIZE))
+        : "r" (next_satp)
         : "memory"
     );
 
