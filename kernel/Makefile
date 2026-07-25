@@ -1,6 +1,6 @@
-QEMU = qemu-system-riscv32
-CC = /opt/homebrew/opt/llvm/bin/clang
-OBJDUMP = /opt/homebrew/opt/llvm/bin/llvm-objdump
+QEMU ?= qemu-system-riscv32
+CC ?= clang
+OBJDUMP ?= llvm-objdump
 CFLAGS = -target riscv32 -mabi=ilp32 -mcmodel=medany -std=c11 -ffreestanding \
          -fno-common -nostdlib -fuse-ld=lld -MMD -MP
 
@@ -8,15 +8,20 @@ BUILD_DIR = ../build/kernel
 KERNEL_ELF = $(BUILD_DIR)/kernel.elf
 KERNEL_MAP = $(BUILD_DIR)/kernel.map
 
-SRCS = $(wildcard *.c)
-OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
-DEPS = $(OBJS:.o=.d)
+C_SRCS = $(wildcard *.c)
+S_SRCS = $(wildcard *.S)
+OBJS = $(addprefix $(BUILD_DIR)/, $(C_SRCS:.c=.o)) $(addprefix $(BUILD_DIR)/, $(S_SRCS:.S=.o))
+DEPS = $(addprefix $(BUILD_DIR)/, $(C_SRCS:.c=.d))
 
 .PHONY: all run clean debug dump
 
 all: $(KERNEL_ELF)
 
 $(BUILD_DIR)/%.o: %.c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: %.S
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 

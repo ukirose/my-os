@@ -19,7 +19,14 @@ SECTIONS {
         *(.text .text.*);
     }
     /* 読み取り専用データ */
-    .rodata : ALIGN(4) { *(.rodata .rodata.*); }
+    .rodata : ALIGN(4) {
+        *(.rodata .rodata.*);
+
+        /* bootelf.S で埋め込まれたELFバイナリの配置とポインタの定義 */
+        . = ALIGN(4);
+        _boot_elf_start = .;
+        KEEP(*(.boot_elf));
+    }
     /* 初期値ありグローバル変数 */
     .data   : ALIGN(4) { *(.data .data.*); }
     /* 初期値なしグローバル変数 (ゼロクリア) */

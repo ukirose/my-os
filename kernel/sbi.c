@@ -15,8 +15,7 @@ struct sbiret {
     long value;
 };
 
-static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
-                              long arg5, long fid, long eid);
+static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long fid, long eid);
 
 /* SBI経由で1文字をシリアルコンソールに出力する */
 void putchar(char c) {
@@ -27,8 +26,7 @@ void putchar(char c) {
  * ecallでS-ModeからM-ModeのOpenSBIに処理を委譲する。
  * SBIの呼出規約では、a0〜a5=引数、a6=fid(機能ID)、a7=eid(拡張ID)をレジスタに設定してからecallを発行する
  */
-static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4,
-                              long arg5, long fid, long eid) {
+static struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long fid, long eid) {
     register long a0 __asm__("a0") = arg0;
     register long a1 __asm__("a1") = arg1;
     register long a2 __asm__("a2") = arg2;

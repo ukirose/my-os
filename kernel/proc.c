@@ -11,12 +11,13 @@
 #include "riscv.h"
 #include "stddef.h"
 #include "string.h"
+#include "elf.h"
 
-#define PROCS_MAX     8            /* 同時に管理できる最大プロセス数 */
+#define PROCS_MAX     8       /* 同時に管理できる最大プロセス数 */
 
 /* プロセス状態 */
-#define PROC_UNUSED   0            /* 非アクティブ状態 */
-#define PROC_RUNNABLE 1            /* 実行可能状態 */
+#define PROC_UNUSED   0       /* 非アクティブ状態 */
+#define PROC_RUNNABLE 1       /* 実行可能状態 */
 
 /* プロセス切り替えによる実行再開に必要なレジスタのスナップショット */
 struct context {
@@ -27,13 +28,14 @@ struct context {
     uint32_t padding[3];
 };
 
-/* プロセスの制御情報を保持するプロセス制御ブロック */
+/* プロセス制御ブロック (PCB) */
 struct process {
     int pid;                            /* プロセス ID */
     int state;                          /* プロセス状態 */
     vaddr_t sp;                         /* カーネルモードスタックポインタ */
+    uint32_t user_pc;                   /* ユーザーモードにおける実行開始アドレス */
     pagetable_t page_table;             /* プロセスごとの1段目ページテーブル */
-    uint8_t kstack[KSTACK_SIZE];         /* プロセス用カーネルスタック */
+    uint8_t kstack[KSTACK_SIZE];        /* プロセス用カーネルスタック */
 };
 
 static struct process procs[PROCS_MAX]; /* 全プロセスの制御ブロックを保持するプロセステーブル */
@@ -42,6 +44,7 @@ static struct process *current_proc;    /* 現在実行中のプロセス */
 #define idle_proc (&procs[0])           /* 常にプロセステーブルの先頭(PID 0)をアイドルプロセスとして扱う */
 
 __attribute__((naked)) static void switch_context(uint32_t *prev_sp, uint32_t *next_sp);
+__attribute__((naked)) static void user_entry(void);
 
 /* アイドルプロセスの生成と初期化 */
 void proc_init(void) {
@@ -50,47 +53,54 @@ void proc_init(void) {
     current_proc = idle_proc;
 }
 
-/* 新規プロセスの生成および初期コンテキストの構築 */
+/* 特権モードで動作する新規カーネルプロセスを生成する */
 struct process *create_process(uint32_t pc) {
-    struct process *p = NULL;
+    struct process *new_proc = NULL;
 
     /* アイドルプロセスの場合は無駄な探索をせず、常に先頭スロットを使用する */
     if (pc == (uint32_t) NULL) {
-        p = idle_proc;
+        new_proc = idle_proc;
     } else {
         /* 一般プロセスの場合は、 PID 1 以降から空きを探す */
         for (int pid = 1; pid < PROCS_MAX; pid++) {
             if (procs[pid].state == PROC_UNUSED) {
-                p = &procs[pid];
+                new_proc = &procs[pid];
                 break;
             }
         }
     }
-    if (!p) PANIC("no free process slots");
+    if (!new_proc) PANIC("no free process slots");
 
     /* カーネルスタックの末尾に初期レジスタの退避領域を確保する */
-    uint32_t stack_top = (uint32_t) p->kstack + sizeof(p->kstack);
+    uint32_t stack_top = (uint32_t) new_proc->kstack + sizeof(new_proc->kstack);
     struct context *ctx = (struct context *) (stack_top - sizeof(struct context));
 
     /* 予期せぬゴミデータを読まないよう、コンテキスト領域全体をゼロクリアする */
     memset(ctx, 0, sizeof(struct context));
 
-    /* 初回のコンテキストスイッチ時に、ret命令でpcへジャンプするよう設定する */
+    /* 初回のコンテキストスイッチ時に、ret命令でプログラムカウンタへジャンプするよう設定する */
     ctx->ra = pc;
-    p->sp = (vaddr_t) ctx;
+    new_proc->sp = (vaddr_t) ctx;
 
-    p->pid = p - procs;     /* プロセステーブルのインデックスをそのままPIDとして割り当てる */
-    p->state = PROC_RUNNABLE;
+    new_proc->pid = new_proc - procs;     /* プロセステーブルのインデックスをそのままPIDとして割り当てる */
+    new_proc->state = PROC_RUNNABLE;
 
     /* 1段目のページテーブルを物理メモリから割り当てる */
-    p->page_table = (pagetable_t)alloc_pages(1);
+    new_proc->page_table = (pagetable_t)alloc_pages(1);
 
     /* ページング有効化後もカーネルの命令を読み込めるよう、カーネル領域を物理アドレスと同一の仮想アドレスで登録する */
     for (paddr_t paddr = (paddr_t)__kernel_base; paddr < PHYSTOP; paddr += PAGE_SIZE) {
-        map_page(p->page_table, paddr, paddr, PTE_R | PTE_W | PTE_X);
+        map_page(new_proc->page_table, paddr, paddr, PTE_R | PTE_W | PTE_X);
     }
 
-    return p;
+    return new_proc;
+}
+
+/* ユーザーモードで動作する新規プロセスを生成する */
+struct process *create_user_process(const uint8_t *elf_data) {
+    struct process *user_proc = create_process((uint32_t) user_entry);
+    user_proc->user_pc = load_elf(user_proc->page_table, elf_data);
+    return user_proc;
 }
 
 /* 次に実行するプロセスを選択し、CPU実行権を譲渡する。 */
@@ -105,9 +115,9 @@ void yield(void) {
         /* 配列の末尾に達したら、アイドルプロセス(PID 0)を飛ばして探索をやり直す */
         if (pid >= PROCS_MAX) pid = 1;
 
-        struct process *p = &procs[pid];
-        if (p->state == PROC_RUNNABLE) {
-            next = p;
+        struct process *candidate = &procs[pid];
+        if (candidate->state == PROC_RUNNABLE) {
+            next = candidate;
             break;
         }
     }
@@ -189,3 +199,53 @@ __attribute__((naked)) static void switch_context(uint32_t *prev_sp, uint32_t *n
         "ret\n"
     );
 }
+
+/* カーネルモードからユーザーモードへの特権レベルの切り替え */
+__attribute__((naked)) static void user_entry(void) {
+    __asm__ __volatile__(
+        /* sepc にユーザープロセスの実行開始アドレスを設定 */
+        "csrw sepc, %[sepc]\n"
+        /* 特権レベルの遷移先をユーザーモードに指定し、割り込みとユーザーメモリアクセスを許可 */
+        "csrw sstatus, %[sstatus]\n"
+
+        /* カーネルの情報漏洩を防ぐため全汎用レジスタをゼロクリア */
+        "mv x1, zero\n"
+        "mv x2, zero\n"
+        "mv x3, zero\n"
+        "mv x4, zero\n"
+        "mv x5, zero\n"
+        "mv x6, zero\n"
+        "mv x7, zero\n"
+        "mv x8, zero\n"
+        "mv x9, zero\n"
+        "mv x10, zero\n"
+        "mv x11, zero\n"
+        "mv x12, zero\n"
+        "mv x13, zero\n"
+        "mv x14, zero\n"
+        "mv x15, zero\n"
+        "mv x16, zero\n"
+        "mv x17, zero\n"
+        "mv x18, zero\n"
+        "mv x19, zero\n"
+        "mv x20, zero\n"
+        "mv x21, zero\n"
+        "mv x22, zero\n"
+        "mv x23, zero\n"
+        "mv x24, zero\n"
+        "mv x25, zero\n"
+        "mv x26, zero\n"
+        "mv x27, zero\n"
+        "mv x28, zero\n"
+        "mv x29, zero\n"
+        "mv x30, zero\n"
+        "mv x31, zero\n"
+
+        /* ユーザーモードへ遷移し、プロセスの実行開始 */
+        "sret\n"
+        :
+        : [sepc] "r" (current_proc->user_pc),
+          [sstatus] "r" (SSTATUS_SPP_U | SSTATUS_SPIE | SSTATUS_SUM)
+    );
+}
+

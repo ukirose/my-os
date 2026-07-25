@@ -9,14 +9,12 @@
 #include "kernel.h"
 #include "mmu.h"
 
-#define is_aligned(value, align) (((value) % (align)) == 0)
-
 /* ページテーブルに仮想アドレスと物理アドレスの対応エントリを登録する */
 void map_page(pagetable_t pt1, uint32_t va, paddr_t pa, uint32_t flags)
 {
     /* アドレス変換はページ単位で行われるため、ページ境界に揃っていないアドレスの登録を禁止する */
-    if (!is_aligned(va, PAGE_SIZE)) PANIC("unaligned va %x", va);
-    if (!is_aligned(pa, PAGE_SIZE)) PANIC("unaligned pa %x", pa);
+    if (!IS_ALIGNED(va, PAGE_SIZE)) PANIC("unaligned va %x", va);
+    if (!IS_ALIGNED(pa, PAGE_SIZE)) PANIC("unaligned pa %x", pa);
 
     /* 1段目ページテーブル(pt1)から該当エントリを特定する */
     uint32_t vpn1 = VPN1(va);
